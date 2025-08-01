@@ -98,27 +98,30 @@ impl CPU {
     // executes an instruction decoded by the step() method
     fn execute(&mut self, instruction: Instruction) -> u16 {
         match instruction {
-            Instruction::Add(target) => {
-                match target {
-                    Target::Reg8(r) => {
-                        let value = self.reg8_lookup(r);
-                        let new_value = self.add(value);
-                        self.registers.a = new_value;
-                        self.pc.wrapping_add(1)
-                    }
-                    Target::Reg16Indirect(r) => {
-                        let addr = self.reg16_lookup(r);
-                        let value = self.bus.read_byte(addr);
-                        let new_value = self.add(value);
-                        self.registers.a = new_value;
-                        self.pc.wrapping_add(1)
-                    }
-                    _ => { self.pc }
-                }
-            }
+            Instruction::Add(target) => self.perform(CPU::add, target),
+            Instruction::Sub(target) => self.perform(CPU::sub, target),
             _ => { self.pc }
         }
 
+    }
+
+    fn perform(&mut self, f: fn(&mut CPU, u8) -> u8, target: Target) -> u16 {
+        match target {
+            Target::Reg8(r) => {
+                let load = self.reg8_lookup(r);
+                let result = f(self, load);
+                self.registers.a = result;
+                self.pc.wrapping_add(1)
+            }
+            Target::Reg16Indirect(r) => {
+                let addr = self.reg16_lookup(r);
+                let load = self.bus.read_byte(addr);
+                let result = f(self, load);
+                self.registers.a = result;
+                self.pc.wrapping_add(1)
+            }
+            _ => { self.pc }
+        }
     }
 
     fn reg8_lookup(&self, register: Reg8) -> u8 {
@@ -148,6 +151,15 @@ impl CPU {
         self.registers.f.subtract = false;
         self.registers.f.carry = did_overflow;
         self.registers.f.half_carry = (self.registers.a & 0xF) + (value & 0xF) > 0xF;
+        new_value
+    }
+
+    fn sub(&mut self, value: u8) -> u8 {
+        let (new_value, did_overflow) = self.registers.a.overflowing_sub(value);
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = true;
+        self.registers.f.carry = did_overflow;
+        self.registers.f.half_carry = ((self.registers.a & 0xF) as i8) - ((value & 0xF) as i8) < 0;
         new_value
     }
 }
