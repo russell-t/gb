@@ -4,13 +4,18 @@ mod reg;
 mod cpu;
 mod memory;
 
+use std::fs;
+
 fn main() {
-    let fr = reg::FlagsRegister {
-        zero: true,
-        subtract: false,
-        half_carry: false,
-        carry: true
-    };
-    let foo: u8 = fr.into();
-    println!("{:b}", foo);
+    match std::fs::read("./09-op r,r.gb") {
+        Ok(bytes) => {
+            for (i, &item) in bytes.iter().enumerate() {
+                println!("{:x} {:x}", i, item);
+            }
+        }
+        Err(e ) => {
+            panic!("{}", e);
+        }
+    }
+    let mut gb_cpu = cpu::CPU::new();
 }

@@ -1,3 +1,5 @@
+use crate::cpu;
+
 #[derive(Debug)]
 pub struct Registers {
     pub a: u8,
@@ -22,6 +24,15 @@ const ZERO_FLAG_BIT_POSITION: u8 = 7;
 const SUBTRACT_FLAG_BIT_POSITION: u8 = 6;
 const HALF_CARRY_FLAG_BIT_POSITION: u8 = 5;
 const CARRY_FLAG_BIT_POSITION: u8 = 4;
+
+impl FlagsRegister {
+    pub fn clear_all(&mut self) {
+        self.zero = false;
+        self.subtract = false;
+        self.half_carry = false;
+        self.carry = false;
+    }
+}
 
 impl From<FlagsRegister> for u8 {
     fn from(flag: FlagsRegister) -> Self {
