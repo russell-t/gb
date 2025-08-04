@@ -13,18 +13,18 @@ fn main() {
 
     /* Instructions Under Test */
     let mut iut: Vec<u8> = (0x80..0xC0).collect();
-    let iut_additional: [u8; 23] = [0x04, 0x05, 0x07, 0x14, 0x15, 0x17, 0x24, 0x25, 0x34, 0x35, 0x37,
+    let iut_additional: [u8; 31] = [0x04, 0x05, 0x07, 0x14, 0x15, 0x17, 0x24, 0x25, 0x34, 0x35, 0x37,
                                    0x0C, 0x0D, 0x0F, 0x1C, 0x1F, 0x1D, 0x2C, 0x2D, 0x2F, 0x3C, 0x3D,
-                                   0x3F];
+                                   0x3F, 0xC6, 0xCE, 0xD6, 0xDE, 0xE6, 0xF6, 0xEE, 0xFE];
     iut.extend(&iut_additional);
 
-    let iut_prefixed: Vec<u8> = (0x00..0x40).collect();
+    let iut_prefixed: Vec<u8> = (0x00..=0xFF).collect();
 
     for i in iut {
         let tests: Vec<cpu::CpuTest> = serde_json::from_str::<Vec<cpu::CpuTest>>(
                 &String::from_utf8(
                     std::fs::read(
-                        format!("sm83/v1/{:02x}.json", i)
+                        format!("sm83/v1/{i:02x}.json")
                     ).unwrap()
                 ).unwrap()
             ).unwrap();
@@ -35,14 +35,14 @@ fn main() {
             gb_cpu.pc = pc;
             gb_cpu.compare_state(&test.final_state);
         }
-        println!("0x{:02x} passed!", i);
+        println!("0x{i:02x} passed!");
     }
 
     for i in iut_prefixed {
         let tests: Vec<cpu::CpuTest> = serde_json::from_str::<Vec<cpu::CpuTest>>(
                 &String::from_utf8(
                     std::fs::read(
-                        format!("sm83/v1/cb {:02x}.json", i)
+                        format!("sm83/v1/cb {i:02x}.json")
                     ).unwrap()
                 ).unwrap()
             ).unwrap();
@@ -53,7 +53,7 @@ fn main() {
             gb_cpu.pc = pc;
             gb_cpu.compare_state(&test.final_state);
         }
-        println!("0xcb{:02x} passed!", i);
+        println!("0xcb{i:02x} passed!");
     }
 
 }
