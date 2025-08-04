@@ -1,5 +1,37 @@
 use crate::reg;
 use crate::memory;
+use crate::reg::FlagsRegister;
+
+use serde::{Serialize,Deserialize};
+use serde_json;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CpuTest {
+    pub name: String,
+    #[serde(rename = "initial")]
+    pub initial_state: CpuState,
+    #[serde(rename = "final")]
+    pub final_state: CpuState,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CpuState {
+    pc: u16,
+    sp: u16,
+    a: u8,
+    b: u8,
+    c: u8,
+    d: u8,
+    e: u8,
+    f: u8,
+    h: u8,
+    l: u8,
+    ime: u8,
+    #[serde(default)]
+    ie: u8,
+    #[serde(default)]
+    ei: u8,
+    ram: Vec<[u16; 2]>,
+}
 
 pub enum Target {
     Reg8(Reg8),
@@ -46,7 +78,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    fn from_byte(byte: u8, prefixed: bool) -> Option<Instruction> {
+    pub fn from_byte(byte: u8, prefixed: bool) -> Option<Instruction> {
         if prefixed {
             Instruction::from_byte_prefixed(byte)
         } else {
@@ -177,7 +209,7 @@ impl Instruction {
             0x8B => Some(Instruction::Adc(Target::Reg8(Reg8::E))),
             0x8C => Some(Instruction::Adc(Target::Reg8(Reg8::H))),
             0x8D => Some(Instruction::Adc(Target::Reg8(Reg8::L))),
-            0x8D => Some(Instruction::Adc(Target::Reg16Indirect(Reg16::HL))),
+            0x8E => Some(Instruction::Adc(Target::Reg16Indirect(Reg16::HL))),
             0x8F => Some(Instruction::Adc(Target::Reg8(Reg8::A))),
 
             0x90 => Some(Instruction::Sub(Target::Reg8(Reg8::B))),
@@ -195,7 +227,7 @@ impl Instruction {
             0x9B => Some(Instruction::Sbc(Target::Reg8(Reg8::E))),
             0x9C => Some(Instruction::Sbc(Target::Reg8(Reg8::H))),
             0x9D => Some(Instruction::Sbc(Target::Reg8(Reg8::L))),
-            0x9D => Some(Instruction::Sbc(Target::Reg16Indirect(Reg16::HL))),
+            0x9E => Some(Instruction::Sbc(Target::Reg16Indirect(Reg16::HL))),
             0x9F => Some(Instruction::Sbc(Target::Reg8(Reg8::A))),
 
             0xA0 => Some(Instruction::And(Target::Reg8(Reg8::B))),
@@ -241,7 +273,8 @@ impl Instruction {
 
 pub struct CPU {
     pub registers: reg::Registers,
-    pc: u16,
+    sp: u16,
+    pub pc: u16,
     bus: memory::MemoryBus,
 }
 
@@ -263,10 +296,50 @@ impl CPU {
                 h: 0,
                 l: 0,
             },
+            sp: 0,
             pc: 0,
             bus: memory::MemoryBus {
-                memory: [0; 0xFFFF]
+                memory: [0; 0x10000]
             }
+        }
+    }
+
+    pub fn set_state(&mut self, state: &CpuState) {
+        self.registers.a = state.a;
+        self.registers.b = state.b;
+        self.registers.c = state.c;
+        self.registers.d = state.d;
+        self.registers.e = state.e;
+        self.registers.f = FlagsRegister::from(state.f);
+        self.registers.h = state.h;
+        self.registers.l = state.l;
+
+        self.sp = state.sp;
+        self.pc = state.pc;
+
+        for m in state.ram.clone() {
+            self.bus.memory[m[0] as usize] = m[1] as u8;
+        }
+    }
+
+    pub fn compare_state(&self, state: &CpuState) {
+        /* Compare registers */
+        assert_eq!(self.registers.a, state.a, "Register A: {} (expected {})", self.registers.a, state.a);
+        assert_eq!(self.registers.b, state.b, "Register B: {} (expected {})", self.registers.b, state.b);
+        assert_eq!(self.registers.c, state.c, "Register C: {} (expected {})", self.registers.c, state.c);
+        assert_eq!(self.registers.d, state.d, "Register D: {} (expected {})", self.registers.d, state.d);
+        assert_eq!(self.registers.e, state.e, "Register E: {} (expected {})", self.registers.e, state.e);
+        assert_eq!(u8::from(self.registers.f), state.f, "Flags: {} (expected {})", u8::from(self.registers.f), state.f);
+        assert_eq!(self.registers.h, state.h, "Register H: {} (expected {})", self.registers.h, state.h);
+        assert_eq!(self.registers.l, state.l, "Register L: {} (expected {})", self.registers.l, state.l);
+
+        /* Compare PC and SP */
+        assert_eq!(self.pc, state.pc, "PC: {} (expected {})", self.pc, state.pc);
+        assert_eq!(self.sp, state.sp, "SP: {} (expected {})", self.sp, state.sp);
+
+        /* Compare memory */
+        for r in state.ram.clone() {
+            assert_eq!(self.bus.memory[r[0] as usize], r[1] as u8);
         }
     }
 
@@ -288,7 +361,7 @@ impl CPU {
     }
 
     // executes an instruction decoded by the step() method
-    fn execute(&mut self, instruction: Instruction) -> u16 {
+    pub fn execute(&mut self, instruction: Instruction) -> u16 {
         match instruction {
             Instruction::Nop => self.nop(),
             Instruction::Cpl => self.cpl(),
@@ -456,8 +529,6 @@ impl CPU {
         self.registers.f.subtract = true;
         self.registers.f.carry = did_overflow;
         self.registers.f.half_carry = ((self.registers.a & 0xF) as i8) - ((value & 0xF) as i8) < 0;
-
-        self.registers.a = result;
     }
 
     fn cpl(&mut self) -> u16 {
@@ -634,7 +705,7 @@ impl CPU {
         let byte_ref: Option<&mut u8> = self.from_target(target);
 
         if let Some(byte) = byte_ref {
-            let bit0: u8 = *byte * 0x1;
+            let bit0: u8 = *byte & 0x1;
             *byte >>= 1;
             *byte |= carry << 7;
 

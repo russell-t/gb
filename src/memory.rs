@@ -1,5 +1,5 @@
 pub struct MemoryBus {
-    pub memory: [u8; 0xFFFF]
+    pub memory: [u8; 0x10000]
 }
 
 impl MemoryBus {
