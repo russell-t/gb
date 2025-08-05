@@ -8,6 +8,10 @@ impl MemoryBus {
         self.memory[addr as usize]
     }
 
+    pub fn write_byte(&mut self, addr: u16, value: u8) {
+        self.memory[addr as usize] = value;
+    }
+
     pub fn get_ref(&mut self, addr: u16) -> &mut u8 {
         &mut self.memory[addr as usize]
     }

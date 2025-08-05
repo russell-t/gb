@@ -12,48 +12,26 @@ fn main() {
     let mut gb_cpu = cpu::CPU::new();
 
     /* Instructions Under Test */
-    let mut iut: Vec<u8> = (0x80..0xC0).collect();
-    let iut_additional: [u8; 31] = [0x04, 0x05, 0x07, 0x14, 0x15, 0x17, 0x24, 0x25, 0x34, 0x35, 0x37,
+    let mut iut: Vec<u8> = (0x40..0xC0).collect();
+    let iut_additional: [u8; 89] = [0x04, 0x05, 0x07, 0x14, 0x15, 0x17, 0x24, 0x25, 0x34, 0x35, 0x37,
                                    0x0C, 0x0D, 0x0F, 0x1C, 0x1F, 0x1D, 0x2C, 0x2D, 0x2F, 0x3C, 0x3D,
-                                   0x3F, 0xC6, 0xCE, 0xD6, 0xDE, 0xE6, 0xF6, 0xEE, 0xFE];
+                                   0x3F, 0xC6, 0xCE, 0xD6, 0xDE, 0xE6, 0xF6, 0xEE, 0xFE, 0xC2, 0xC3,
+                                   0xD2, 0xCA, 0xDA, 0xE9, 0x18, 0x20, 0x28, 0x30, 0x38, 0x21, 0x01,
+                                   0x31, 0x06, 0x16, 0x26, 0x36, 0x0E, 0x1E, 0x2E, 0x3E, 0x02, 0x12,
+                                   0x22, 0x32, 0x0A, 0x1A, 0x2A, 0x3A, 0xEA, 0xFA, 0xE0, 0xE2, 0xF0,
+                                   0xF2, 0xC1, 0xD1, 0xE1, 0xF1, 0xC5, 0xD5, 0xE5, 0xF5, 0xC4, 0xD4,
+                                   0xCC, 0xDC, 0xCD, 0xC0, 0xC9, 0xD0, 0xC8, 0xD8, 0x03, 0x13, 0x23,
+                                   0x33];
     iut.extend(&iut_additional);
 
     let iut_prefixed: Vec<u8> = (0x00..=0xFF).collect();
 
-    for i in iut {
-        let tests: Vec<cpu::CpuTest> = serde_json::from_str::<Vec<cpu::CpuTest>>(
-                &String::from_utf8(
-                    std::fs::read(
-                        format!("sm83/v1/{i:02x}.json")
-                    ).unwrap()
-                ).unwrap()
-            ).unwrap();
-        for test in tests {
-            gb_cpu.set_state(&test.initial_state);
-            let instruction: cpu::Instruction = cpu::Instruction::from_byte(i, false).unwrap();
-            let pc = gb_cpu.execute(instruction);
-            gb_cpu.pc = pc;
-            gb_cpu.compare_state(&test.final_state);
-        }
-        println!("0x{i:02x} passed!");
-    }
 
-    for i in iut_prefixed {
-        let tests: Vec<cpu::CpuTest> = serde_json::from_str::<Vec<cpu::CpuTest>>(
-                &String::from_utf8(
-                    std::fs::read(
-                        format!("sm83/v1/cb {i:02x}.json")
-                    ).unwrap()
-                ).unwrap()
-            ).unwrap();
-        for test in tests {
-            gb_cpu.set_state(&test.initial_state);
-            let instruction: cpu::Instruction = cpu::Instruction::from_byte(i, true).unwrap();
-            let pc = gb_cpu.execute(instruction);
-            gb_cpu.pc = pc;
-            gb_cpu.compare_state(&test.final_state);
-        }
-        println!("0xcb{i:02x} passed!");
-    }
+    gb_cpu.load_rom("09-op r,r.gb");
+    gb_cpu.run();
+
+    /* Run SM83 JSON tests on u8 opcodes specified above */
+    //gb_cpu.run_sm83_tests(&iut, false);
+    //gb_cpu.run_sm83_tests(&iut_prefixed, true);
 
 }

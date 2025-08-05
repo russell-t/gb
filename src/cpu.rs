@@ -40,12 +40,16 @@ pub enum Target {
 }
 
 pub enum Reg8 {
-    A, B, C, D, E, H, L,
+    A, B, C, D, E, H, L, D8, HLI, BCI, DEI, HLII, HLDI, D16I, CI, D8I
 }
 
 // af, bc, de, hl
 pub enum Reg16 {
-    AF, BC, DE, HL, 
+    AF, BC, DE, HL, SP, D16, I16
+}
+
+pub enum StackTarget {
+    AF, BC, DE, HL
 }
 
 pub enum Instruction {
@@ -99,6 +103,32 @@ pub enum Instruction {
     Rla,
     Rrca,
     Rra,
+
+    HALT,
+    DI,
+
+    JP(JumpTest),
+    JR(JumpTest),
+    JPHL,
+
+    LD(LoadType),
+    POP(StackTarget),
+    PUSH(StackTarget),
+    CALL(JumpTest),
+    RET(JumpTest),
+}
+
+pub enum JumpTest {
+    NotZero,
+    Zero,
+    NotCarry,
+    Carry,
+    Always
+}
+
+pub enum LoadType {
+    Word(Reg16, Reg16),
+    Byte(Reg8, Reg8),
 }
 
 impl Instruction {
@@ -401,9 +431,7 @@ impl Instruction {
             0xFC => Some(Instruction::Set7(Target::Reg8(Reg8::H))),
             0xFD => Some(Instruction::Set7(Target::Reg8(Reg8::L))),
             0xFE => Some(Instruction::Set7(Target::Reg16Indirect(Reg16::HL))),
-            0xFF => Some(Instruction::Set7(Target::Reg8(Reg8::A))),
-
-            _ => { /* Add more instructions */ None }
+            0xFF => Some(Instruction::Set7(Target::Reg8(Reg8::A)))
         }
     }
 
@@ -427,6 +455,11 @@ impl Instruction {
             0x2C => Some(Instruction::Inc(Target::Reg8(Reg8::L))),
             0x34 => Some(Instruction::Inc(Target::Reg16Indirect(Reg16::HL))),
             0x3C => Some(Instruction::Inc(Target::Reg8(Reg8::A))),
+
+            0x03 => Some(Instruction::Inc(Target::Reg16(Reg16::BC))),
+            0x13 => Some(Instruction::Inc(Target::Reg16(Reg16::DE))),
+            0x23 => Some(Instruction::Inc(Target::Reg16(Reg16::HL))),
+            0x33 => Some(Instruction::Inc(Target::Reg16(Reg16::SP))),
 
             0x05 => Some(Instruction::Dec(Target::Reg8(Reg8::B))),
             0x0D => Some(Instruction::Dec(Target::Reg8(Reg8::C))),
@@ -517,6 +550,142 @@ impl Instruction {
             0xBF => Some(Instruction::Cp(Target::Reg8(Reg8::A))),
             0xFE => Some(Instruction::Cp(Target::Value)),
 
+            0xC2 => Some(Instruction::JP(JumpTest::NotZero)),
+            0xC3 => Some(Instruction::JP(JumpTest::Always)),
+            0xD2 => Some(Instruction::JP(JumpTest::NotCarry)),
+            0xCA => Some(Instruction::JP(JumpTest::Zero)),
+            0xDA => Some(Instruction::JP(JumpTest::Carry)),
+            0xE9 => Some(Instruction::JPHL),
+
+            0x20 => Some(Instruction::JR(JumpTest::NotZero)),
+            0x18 => Some(Instruction::JR(JumpTest::Always)),
+            0x30 => Some(Instruction::JR(JumpTest::NotCarry)),
+            0x28 => Some(Instruction::JR(JumpTest::Zero)),
+            0x38 => Some(Instruction::JR(JumpTest::Carry)),
+
+            0x01 => Some(Instruction::LD(LoadType::Word(Reg16::BC,Reg16::D16))),
+            0x11 => Some(Instruction::LD(LoadType::Word(Reg16::DE,Reg16::D16))),
+            0x21 => Some(Instruction::LD(LoadType::Word(Reg16::HL,Reg16::D16))),
+            0x31 => Some(Instruction::LD(LoadType::Word(Reg16::SP,Reg16::D16))),
+
+            0x40 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::B))),
+            0x41 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::C))),
+            0x42 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::D))),
+            0x43 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::E))),
+            0x44 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::H))),
+            0x45 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::L))),
+            0x46 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::HLI))),
+            0x47 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::A))),
+            0x48 => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::B))),
+            0x49 => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::C))),
+            0x4A => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::D))),
+            0x4B => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::E))),
+            0x4C => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::H))),
+            0x4D => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::L))),
+            0x4E => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::HLI))),
+            0x4F => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::A))),
+
+            0x50 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::B))),
+            0x51 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::C))),
+            0x52 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::D))),
+            0x53 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::E))),
+            0x54 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::H))),
+            0x55 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::L))),
+            0x56 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::HLI))),
+            0x57 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::A))),
+            0x58 => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::B))),
+            0x59 => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::C))),
+            0x5A => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::D))),
+            0x5B => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::E))),
+            0x5C => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::H))),
+            0x5D => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::L))),
+            0x5E => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::HLI))),
+            0x5F => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::A))),
+
+            0x60 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::B))),
+            0x61 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::C))),
+            0x62 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::D))),
+            0x63 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::E))),
+            0x64 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::H))),
+            0x65 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::L))),
+            0x66 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::HLI))),
+            0x67 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::A))),
+            0x68 => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::B))),
+            0x69 => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::C))),
+            0x6A => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::D))),
+            0x6B => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::E))),
+            0x6C => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::H))),
+            0x6D => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::L))),
+            0x6E => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::HLI))),
+            0x6F => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::A))),
+
+            0x70 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::B))),
+            0x71 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::C))),
+            0x72 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::D))),
+            0x73 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::E))),
+            0x74 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::H))),
+            0x75 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::L))),
+            0x76 => Some(Instruction::HALT),
+            0x77 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::A))),
+            0x78 => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::B))),
+            0x79 => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::C))),
+            0x7A => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::D))),
+            0x7B => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::E))),
+            0x7C => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::H))),
+            0x7D => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::L))),
+            0x7E => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::HLI))),
+            0x7F => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::A))),
+            
+            0x06 => Some(Instruction::LD(LoadType::Byte(Reg8::B,Reg8::D8))),
+            0x16 => Some(Instruction::LD(LoadType::Byte(Reg8::D,Reg8::D8))),
+            0x26 => Some(Instruction::LD(LoadType::Byte(Reg8::H,Reg8::D8))),
+            0x36 => Some(Instruction::LD(LoadType::Byte(Reg8::HLI,Reg8::D8))),
+            0x0E => Some(Instruction::LD(LoadType::Byte(Reg8::C,Reg8::D8))),
+            0x1E => Some(Instruction::LD(LoadType::Byte(Reg8::E,Reg8::D8))),
+            0x2E => Some(Instruction::LD(LoadType::Byte(Reg8::L,Reg8::D8))),
+            0x3E => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::D8))),
+
+            0x02 => Some(Instruction::LD(LoadType::Byte(Reg8::BCI,Reg8::A))),
+            0x12 => Some(Instruction::LD(LoadType::Byte(Reg8::DEI,Reg8::A))),
+            0x22 => Some(Instruction::LD(LoadType::Byte(Reg8::HLII,Reg8::A))),
+            0x32 => Some(Instruction::LD(LoadType::Byte(Reg8::HLDI,Reg8::A))),
+            0x0A => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::BCI))),
+            0x1A => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::DEI))),
+            0x2A => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::HLII))),
+            0x3A => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::HLDI))),
+
+            0xEA => Some(Instruction::LD(LoadType::Byte(Reg8::D16I,Reg8::A))),
+            0xFA => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::D16I))),
+
+            0xE0 => Some(Instruction::LD(LoadType::Byte(Reg8::D8I,Reg8::A))),
+            0xE2 => Some(Instruction::LD(LoadType::Byte(Reg8::CI,Reg8::A))),
+            0xF0 => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::D8I))),
+            0xF2 => Some(Instruction::LD(LoadType::Byte(Reg8::A,Reg8::CI))),
+
+            0xF3 => Some(Instruction::DI),
+
+            0xC1 => Some(Instruction::POP(StackTarget::BC)),
+            0xD1 => Some(Instruction::POP(StackTarget::DE)),
+            0xE1 => Some(Instruction::POP(StackTarget::HL)),
+            0xF1 => Some(Instruction::POP(StackTarget::AF)),
+
+            0xC5 => Some(Instruction::PUSH(StackTarget::BC)),
+            0xD5 => Some(Instruction::PUSH(StackTarget::DE)),
+            0xE5 => Some(Instruction::PUSH(StackTarget::HL)),
+            0xF5 => Some(Instruction::PUSH(StackTarget::AF)),
+
+            0xC4 => Some(Instruction::CALL(JumpTest::NotZero)),
+            0xCD => Some(Instruction::CALL(JumpTest::Always)),
+            0xD4 => Some(Instruction::CALL(JumpTest::NotCarry)),
+            0xCC => Some(Instruction::CALL(JumpTest::Zero)),
+            0xDC => Some(Instruction::CALL(JumpTest::Carry)),
+
+            0xC0 => Some(Instruction::RET(JumpTest::NotZero)),
+            0xC9 => Some(Instruction::RET(JumpTest::Always)),
+            0xD0 => Some(Instruction::RET(JumpTest::NotCarry)),
+            0xC8 => Some(Instruction::RET(JumpTest::Zero)),
+            0xD8 => Some(Instruction::RET(JumpTest::Carry)),
+
             _ => { /* Add more instructions */ None }
         }
     }
@@ -552,6 +721,31 @@ impl CPU {
             bus: memory::MemoryBus {
                 memory: [0; 0x10000]
             }
+        }
+    }
+
+    pub fn load_rom(&mut self, filepath: &str) {
+        let rom: Vec<u8> = std::fs::read(filepath).unwrap();
+        self.bus.memory[0..32768].copy_from_slice(&rom[..]);
+        self.pc = 0x100;
+    }
+
+    pub fn run_sm83_tests(&mut self, op_codes: &Vec<u8>, prefixed: bool) {
+        for &i in op_codes {
+            let tests: Vec<CpuTest> = serde_json::from_str::<Vec<CpuTest>>(
+                    &String::from_utf8(
+                        std::fs::read(
+                            format!("sm83/v1/{}{i:02x}.json", if prefixed { "cb " } else { "" })
+                        ).unwrap()
+                    ).unwrap()
+                ).unwrap();
+            for test in tests {
+                self.set_state(&test.initial_state);
+                let instruction: Instruction = Instruction::from_byte(i, prefixed).unwrap();
+                self.pc = self.execute(instruction);
+                self.compare_state(&test.final_state);
+            }
+            println!("0x{}{i:02x} passed!", if prefixed { "cb" } else { "" });
         }
     }
 
@@ -595,6 +789,17 @@ impl CPU {
         }
     }
 
+    pub fn run(&mut self) {
+        loop {
+            self.step();
+
+            if (self.bus.memory[0xff02] == 0x81) {
+                print!("{}", self.bus.memory[0xff01] as char);
+                self.bus.memory[0xff01] = 0;
+            }
+        }
+    }
+
     fn step(&mut self) {
         let mut instruction_byte = self.bus.read_byte(self.pc);
         let prefixed = instruction_byte == 0xCB;
@@ -603,9 +808,10 @@ impl CPU {
             instruction_byte = self.bus.read_byte(self.pc.wrapping_add(1));
         }
 
-        let next_pc = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
+        let next_pc: u16 = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
             self.execute(instruction)
         } else {
+            println!("{:?} PC:{} SP:{} RAM at PC:{}", self.registers, self.pc, self.sp, self.bus.memory[self.pc as usize]);
             panic!("Unknown instruction: 0x{instruction_byte:x}");
         };
 
@@ -615,6 +821,90 @@ impl CPU {
     // executes an instruction decoded by the step() method
     pub fn execute(&mut self, instruction: Instruction) -> u16 {
         match instruction {
+            Instruction::JP(test) => {
+                let jump_condition: bool = match test {
+                    JumpTest::Always => true,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotZero => !self.registers.f.zero
+                };
+                self.jp(jump_condition)
+            }
+            Instruction::JR(test) => {
+                let jump_condition: bool = match test {
+                    JumpTest::Always => true,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotZero => !self.registers.f.zero
+                };
+                self.jr(jump_condition)
+            }
+            Instruction::JPHL => self.jphl(),
+            Instruction::DI => { self.pc.wrapping_add(1) },
+
+            Instruction::LD(load_type) => self.ld(load_type),
+
+            Instruction::CALL(test) => {
+                let jump_condition: bool = match test {
+                    JumpTest::Always => true,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotZero => !self.registers.f.zero
+                };
+                self.call(jump_condition)
+            }
+
+            Instruction::RET(test) => {
+                let jump_condition: bool = match test {
+                    JumpTest::Always => true,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::NotZero => !self.registers.f.zero
+                };
+                self.ret(jump_condition)
+            }
+
+            Instruction::PUSH(target) => {
+                let value = match target {
+                    StackTarget::AF => {
+                        self.registers.get_af()
+                    }
+                    StackTarget::BC => {
+                        self.registers.get_bc()
+                    }
+                    StackTarget::DE => {
+                        self.registers.get_de()
+                    }
+                    StackTarget::HL => {
+                        self.registers.get_hl()
+                    }
+                };
+                self.push(value)
+            }
+
+            Instruction::POP(target) => {
+                let (pc, value) = self.pop();
+                match target {
+                    StackTarget::AF => {
+                        self.registers.set_af(value);
+                    }
+                    StackTarget::BC => {
+                        self.registers.set_bc(value);
+                    }
+                    StackTarget::DE => {
+                        self.registers.set_de(value);
+                    }
+                    StackTarget::HL => {
+                        self.registers.set_hl(value);
+                    }
+                };
+                pc
+            }
+
             Instruction::Nop => self.nop(),
             Instruction::Cpl => self.cpl(),
             Instruction::Ccf => self.ccf(),
@@ -623,6 +913,7 @@ impl CPU {
             Instruction::Rla => self.rla(),
             Instruction::Rrca => self.rrca(),
             Instruction::Rra => self.rra(),
+            Instruction::HALT => { self.pc.wrapping_add(1) },
             Instruction::Bit0(target) => self.bit(target, 0),
             Instruction::Bit1(target) => self.bit(target, 1),
             Instruction::Bit2(target) => self.bit(target, 2),
@@ -679,6 +970,7 @@ impl CPU {
             Reg8::H => &mut self.registers.h,
             Reg8::L => &mut self.registers.l,
             Reg8::A => &mut self.registers.a,
+            _ => { panic!("D8 lookup"); }
         }
     }
 
@@ -688,6 +980,7 @@ impl CPU {
             Reg16::BC => self.registers.get_bc(),
             Reg16::DE => self.registers.get_de(),
             Reg16::HL => self.registers.get_hl(),
+            _ => 0
         }
     }
 
@@ -705,6 +998,197 @@ impl CPU {
             }
             _ => { None }
         }
+    }
+
+    fn call(&mut self, jump: bool) -> u16 {
+        let pc_next = self.pc.wrapping_add(3);
+        if jump {
+            self.push(pc_next);
+            let lsb: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+            let msb: u16 = self.bus.read_byte(self.pc.wrapping_add(2)) as u16;
+            (msb << 8) | lsb
+        } else {
+            pc_next
+        }
+    }
+
+    fn ret(&mut self, jump: bool) -> u16 {
+        if jump {
+            self.pop().1
+        } else {
+            self.pc.wrapping_add(1)
+        }
+    }
+
+    fn push(&mut self, value: u16) -> u16 {
+        self.sp = self.sp.wrapping_sub(1);
+        self.bus.write_byte(self.sp, ((value & 0xFF00) >> 8) as u8);
+        self.sp = self.sp.wrapping_sub(1);
+        self.bus.write_byte(self.sp, (value & 0xFF) as u8);
+
+        self.pc.wrapping_add(1)
+    }
+
+    fn pop(&mut self) -> (u16,u16) {
+        let lsb = self.bus.read_byte(self.sp) as u16;
+        self.sp = self.sp.wrapping_add(1);
+        let msb = self.bus.read_byte(self.sp) as u16;
+        self.sp = self.sp.wrapping_add(1);
+
+        (self.pc.wrapping_add(1), (msb << 8) | lsb)
+    }
+
+    fn ld(&mut self, load_type: LoadType) -> u16 {
+        match load_type {
+            LoadType::Word(target, source) => {
+                let source_value: u16 = match source {
+                    Reg16::D16 => {
+                        let lsb: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+                        let msb: u16 = self.bus.read_byte(self.pc.wrapping_add(2)) as u16;
+                        (msb << 8) | lsb
+                    }
+                    _ => { panic!("Unknown load source!"); }
+                };
+                match target {
+                    Reg16::BC => {
+                        self.registers.set_bc(source_value);
+                    }
+                    Reg16::DE => {
+                        self.registers.set_de(source_value);
+                    }
+                    Reg16::HL => {
+                        self.registers.set_hl(source_value);
+                    }
+                    Reg16::SP => {
+                        self.sp = source_value;
+                    }
+                    _ => { panic!("Unknown load target!"); }
+                }
+                self.pc.wrapping_add(3)
+            }
+            LoadType::Byte(target,source) => {
+                let source_value: u8 = match source {
+                    Reg8::A => self.registers.a,
+                    Reg8::B => self.registers.b,
+                    Reg8::C => self.registers.c,
+                    Reg8::D => self.registers.d,
+                    Reg8::E => self.registers.e,
+                    Reg8::H => self.registers.h,
+                    Reg8::L => self.registers.l,
+                    Reg8::D8 => self.bus.read_byte(self.pc.wrapping_add(1)),
+                    Reg8::BCI => self.bus.read_byte(self.registers.get_bc()),
+                    Reg8::DEI => self.bus.read_byte(self.registers.get_de()),
+                    Reg8::HLI => self.bus.read_byte(self.registers.get_hl()),
+                    Reg8::HLII => {
+                        let hl = self.registers.get_hl();
+                        let value = self.bus.read_byte(hl);
+                        self.registers.set_hl(hl.wrapping_add(1));
+                        value
+                    }
+                    Reg8::HLDI => {
+                        let hl = self.registers.get_hl();
+                        let value = self.bus.read_byte(hl);
+                        self.registers.set_hl(hl.wrapping_sub(1));
+                        value
+                    }
+                    Reg8::D16I => {
+                        let lsb: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+                        let msb: u16 = self.bus.read_byte(self.pc.wrapping_add(2)) as u16;
+                        let addr = (msb << 8) | lsb;
+                        self.bus.read_byte(addr)
+                    }
+                    Reg8::D8I => {
+                        let byte: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+                        let addr: u16 = 0xFF00 + byte;
+                        self.bus.read_byte(addr)
+                    }
+                    Reg8::CI => {
+                        let addr = (0xFF00 as u16) + (self.registers.c as u16);
+                        self.bus.read_byte(addr)
+                    }
+                };
+                match target {
+                    Reg8::A => { self.registers.a = source_value; }
+                    Reg8::B => { self.registers.b = source_value; }
+                    Reg8::C => { self.registers.c = source_value; }
+                    Reg8::D => { self.registers.d = source_value; }
+                    Reg8::E => { self.registers.e = source_value; }
+                    Reg8::H => { self.registers.h = source_value; }
+                    Reg8::L => { self.registers.l = source_value; }
+                    Reg8::BCI => { self.bus.write_byte(self.registers.get_bc(), source_value); }
+                    Reg8::DEI => { self.bus.write_byte(self.registers.get_de(), source_value); }
+                    Reg8::HLI => { self.bus.write_byte(self.registers.get_hl(), source_value); }
+                    Reg8::HLII => {
+                        let hl = self.registers.get_hl();
+                        self.bus.write_byte(hl, source_value);
+                        self.registers.set_hl(hl.wrapping_add(1));
+                        
+                    }
+                    Reg8::HLDI => {
+                        let hl = self.registers.get_hl();
+                        self.bus.write_byte(hl, source_value);
+                        self.registers.set_hl(hl.wrapping_sub(1));
+                    }
+                    Reg8::D16I => {
+                        let lsb: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+                        let msb: u16 = self.bus.read_byte(self.pc.wrapping_add(2)) as u16;
+                        let addr = (msb << 8) | lsb;
+                        self.bus.write_byte(addr, source_value);
+                    }
+                    Reg8::D8I => {
+                        let byte: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+                        let addr: u16 = 0xFF00 + byte;
+                        self.bus.write_byte(addr, source_value);
+                    }
+                    Reg8::CI => {
+                        let addr = (0xFF00 as u16) + (self.registers.c as u16);
+                        self.bus.write_byte(addr, source_value);
+                    }
+                    _ => { panic!("D8 Target"); }
+                }
+                match (target,source) {
+                    (_,Reg8::D8)   => self.pc.wrapping_add(2),
+                    (Reg8::D8I,_)  => self.pc.wrapping_add(2),
+                    (_,Reg8::D8I)  => self.pc.wrapping_add(2),
+
+                    (Reg8::D16I,_) => self.pc.wrapping_add(3),
+                    (_,Reg8::D16I) => self.pc.wrapping_add(3),
+
+                    (_,_)          => self.pc.wrapping_add(1)
+                }
+                
+            }
+        }
+    }
+
+    fn jp(&self, jump: bool) -> u16 {
+        if jump {
+            let lsb: u16 = self.bus.read_byte(self.pc.wrapping_add(1)) as u16;
+            let msb: u16 = self.bus.read_byte(self.pc.wrapping_add(2)) as u16;
+            (msb << 8) | lsb
+        } else {
+            self.pc.wrapping_add(3)
+        }
+    }
+    
+    fn jr(&self, jump: bool) -> u16 {
+        if jump {
+            let rel_addr: i8 = self.bus.read_byte(self.pc.wrapping_add(1)) as i8;
+            let mag: u16 = rel_addr.unsigned_abs() as u16;
+
+            if (rel_addr & -128) == -128 {
+                self.pc.wrapping_add(2).wrapping_sub(mag)
+            } else { 
+                self.pc.wrapping_add(2).wrapping_add(mag)
+            }
+
+        } else {
+            self.pc.wrapping_add(2)
+        }
+    }
+
+    fn jphl(&self) -> u16 {
+        self.registers.get_hl()
     }
     
     fn add(&mut self, target: Target) -> u16 {
@@ -960,20 +1444,41 @@ impl CPU {
     }
 
     pub fn inc(&mut self, target: Target) -> u16 {
-        let byte_ref: Option<&mut u8> = self.ref_from_target(target);
+        match target {
+            Target::Reg16(t) => {
+                match t {
+                    Reg16::BC => {
+                        let value = self.registers.get_bc();
+                        self.registers.set_bc(value.wrapping_add(1));
+                    }
+                    Reg16::DE => {
+                        let value = self.registers.get_de();
+                        self.registers.set_de(value.wrapping_add(1));
+                    }
+                    Reg16::HL => {
+                        let value = self.registers.get_hl();
+                        self.registers.set_hl(value.wrapping_add(1));
+                    }
+                    Reg16::SP => {
+                        self.sp = self.sp.wrapping_add(1);
+                    }
+                    _ => { panic!("INC unknown reg16 target"); }
+                }
+            }
+            _ => {
+                let byte = self.ref_from_target(target).unwrap();
+                let prior = *byte;
+                *byte = byte.wrapping_add(1);
 
-        if let Some(byte) = byte_ref {
-            let prior = *byte;
-            *byte = byte.wrapping_add(1);
-
-            self.registers.f.zero = *byte == 0;
-            self.registers.f.subtract = false;
-            self.registers.f.half_carry = (prior & 0xF) + 1 > 0xF;
+                self.registers.f.zero = *byte == 0;
+                self.registers.f.subtract = false;
+                self.registers.f.half_carry = (prior & 0xF) + 1 > 0xF;
+            }
+        }
+        
+            
 
             self.pc.wrapping_add(1)
-        } else {
-            panic!("INC unknown target");
-        }
     }
 
     fn dec(&mut self, target: Target) -> u16 {
