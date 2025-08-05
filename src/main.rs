@@ -31,7 +31,7 @@ fn main() {
     //let mut iut: Vec<u8> = vec![0x09, 0x19, 0x29, 0x39];
     //gb_cpu.run_sm83_tests(&iut, false);
 
-    gb_cpu.load_rom("09-op r,r.gb");
+    gb_cpu.load_rom("gb-test-roms/cpu_instrs/individual/09-op r,r.gb");
     gb_cpu.run();
 
     /* Run SM83 JSON tests on u8 opcodes specified above */
