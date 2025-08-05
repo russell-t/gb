@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::reg;
 use crate::memory;
 use crate::reg::FlagsRegister;
@@ -52,8 +54,13 @@ pub enum StackTarget {
     AF, BC, DE, HL
 }
 
+pub enum AddHLTarget {
+    BC, DE, HL, SP
+}
+
 pub enum Instruction {
     Add(Target),
+    AddHL(AddHLTarget),
     Adc(Target),
     Sub(Target),
     Sbc(Target),
@@ -479,6 +486,10 @@ impl Instruction {
             0x86 => Some(Instruction::Add(Target::Reg16Indirect(Reg16::HL))),
             0x87 => Some(Instruction::Add(Target::Reg8(Reg8::A))),
             0xC6 => Some(Instruction::Add(Target::Value)),
+            0x09 => Some(Instruction::AddHL(AddHLTarget::BC)),
+            0x19 => Some(Instruction::AddHL(AddHLTarget::DE)),
+            0x29 => Some(Instruction::AddHL(AddHLTarget::HL)),
+            0x39 => Some(Instruction::AddHL(AddHLTarget::SP)),
 
             0x88 => Some(Instruction::Adc(Target::Reg8(Reg8::B))),
             0x89 => Some(Instruction::Adc(Target::Reg8(Reg8::C))),
@@ -913,7 +924,10 @@ impl CPU {
             Instruction::Rla => self.rla(),
             Instruction::Rrca => self.rrca(),
             Instruction::Rra => self.rra(),
-            Instruction::HALT => { self.pc.wrapping_add(1) },
+            Instruction::HALT => { 
+                println!("halt");
+                self.pc.wrapping_add(1)
+            },
             Instruction::Bit0(target) => self.bit(target, 0),
             Instruction::Bit1(target) => self.bit(target, 1),
             Instruction::Bit2(target) => self.bit(target, 2),
@@ -949,6 +963,7 @@ impl CPU {
             Instruction::Inc(target) => self.inc(target),
             Instruction::Dec(target) => self.dec(target),
             Instruction::Add(target) => self.add(target),
+            Instruction::AddHL(target) => self.addhl(target),
             Instruction::Adc(target) => self.adc(target),
             Instruction::Sub(target) => self.sub(target),
             Instruction::Sbc(target) => self.sbc(target),
@@ -1103,7 +1118,7 @@ impl CPU {
                         self.bus.read_byte(addr)
                     }
                     Reg8::CI => {
-                        let addr = (0xFF00 as u16) + (self.registers.c as u16);
+                        let addr = 0xFF00_u16 + (self.registers.c as u16);
                         self.bus.read_byte(addr)
                     }
                 };
@@ -1141,7 +1156,7 @@ impl CPU {
                         self.bus.write_byte(addr, source_value);
                     }
                     Reg8::CI => {
-                        let addr = (0xFF00 as u16) + (self.registers.c as u16);
+                        let addr = 0xFF00_u16 + (self.registers.c as u16);
                         self.bus.write_byte(addr, source_value);
                     }
                     _ => { panic!("D8 Target"); }
@@ -1190,8 +1205,28 @@ impl CPU {
     fn jphl(&self) -> u16 {
         self.registers.get_hl()
     }
+
+    fn addhl(&mut self, target: AddHLTarget) -> u16 {
+
+        let source_value = match target {
+            AddHLTarget::HL => self.registers.get_hl(),
+            AddHLTarget::BC => self.registers.get_bc(),
+            AddHLTarget::DE => self.registers.get_de(),
+            AddHLTarget::SP => self.sp
+        };
+        
+        let (result, did_overflow) = self.registers.get_hl().overflowing_add(source_value);
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = (self.registers.get_hl() & 0xFFF) + (source_value & 0xFFF) > 0xFFF;
+        self.registers.f.carry = did_overflow;
+
+        self.registers.set_hl(result);
+
+        self.pc.wrapping_add(1)
+    }
     
     fn add(&mut self, target: Target) -> u16 {
+
         let pc_update: u16 = match target {
             Target::Value => 2,
             _ => 1
@@ -1476,9 +1511,7 @@ impl CPU {
             }
         }
         
-            
-
-            self.pc.wrapping_add(1)
+        self.pc.wrapping_add(1)
     }
 
     fn dec(&mut self, target: Target) -> u16 {

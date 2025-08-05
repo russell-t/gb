@@ -12,6 +12,7 @@ fn main() {
     let mut gb_cpu = cpu::CPU::new();
 
     /* Instructions Under Test */
+    /*
     let mut iut: Vec<u8> = (0x40..0xC0).collect();
     let iut_additional: [u8; 89] = [0x04, 0x05, 0x07, 0x14, 0x15, 0x17, 0x24, 0x25, 0x34, 0x35, 0x37,
                                    0x0C, 0x0D, 0x0F, 0x1C, 0x1F, 0x1D, 0x2C, 0x2D, 0x2F, 0x3C, 0x3D,
@@ -25,13 +26,16 @@ fn main() {
     iut.extend(&iut_additional);
 
     let iut_prefixed: Vec<u8> = (0x00..=0xFF).collect();
+    */
 
+    //let mut iut: Vec<u8> = vec![0x09, 0x19, 0x29, 0x39];
+    //gb_cpu.run_sm83_tests(&iut, false);
 
     gb_cpu.load_rom("09-op r,r.gb");
     gb_cpu.run();
 
     /* Run SM83 JSON tests on u8 opcodes specified above */
-    //gb_cpu.run_sm83_tests(&iut, false);
+    
     //gb_cpu.run_sm83_tests(&iut_prefixed, true);
 
 }
